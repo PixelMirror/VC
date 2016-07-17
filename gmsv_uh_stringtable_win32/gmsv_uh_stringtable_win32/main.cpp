@@ -259,14 +259,14 @@ int StringTable_ToTable(lua_State *state) {
 GMOD_MODULE_OPEN() {
 	networktablecontainer = GetInterface<INetworkStringTableContainer*>("engine", INTERFACENAME_NETWORKSTRINGTABLESERVER);
 	if (!networktablecontainer) {
-		LUA->ThrowError("[uh_stringtable] No INetworkStringTableContainer on engine!\n");
+		LUA->ThrowError("[uh_stringtable]: No INetworkStringTableContainer on engine!\n");
 		return 0;
 	}
 	
 	HMODULE hModule = GetModuleHandle("lua_shared.dll");
 	luaL_checkudata = (luaL_checkudataFn)GetProcAddress(hModule, "luaL_checkudata");
 	if (!luaL_checkudata) {
-		LUA->ThrowError("[uh_stringtable] No luaL_checkudata on lua_shared!\n");
+		LUA->ThrowError("[uh_stringtable]: No luaL_checkudata on lua_shared!\n");
 		return 0;
 	}
 	
