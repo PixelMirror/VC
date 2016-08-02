@@ -99,7 +99,11 @@ LUA_FUNCTION(Close) {
 
 //IsValid
 LUA_FUNCTION(IsValid) {
-	LUA->PushBool( (bool)hDevice );
+	if (!hDevice) {
+		LUA->PushBool(false);
+		return 1;
+	}
+	LUA->PushBool( hDevice != INVALID_HANDLE_VALUE );
 	return 1;
 }
 
@@ -189,6 +193,10 @@ GMOD_MODULE_OPEN() {
 
 //Close
 GMOD_MODULE_CLOSE() {
+	//Close port
+	CloseHandle(hDevice);
+	hDevice = NULL;
+	
 	return 0;
 }
 
