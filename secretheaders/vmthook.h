@@ -1,57 +1,102 @@
 
-
-#ifndef __CVMTHOOK_H__
-#define __CVMTHOOK_H__
-
 #pragma once
-
+//===================================================================================
 #include <Windows.h>
-
-class CVMTHook
+//===================================================================================
+class CVMTHookManager
 {
 public:
-	DWORD Hook ( DWORD new_Function, PDWORD pClass, int index )
+	CVMTHookManager( )
 	{
-		m_NewFunction = new_Function;
-		m_FunctionIndex = index;
-		m_ClassTable = *( PDWORD* )pClass;
-		m_OriginalFunction = m_ClassTable[ m_FunctionIndex ];
-		m_FunctionPointer = &m_ClassTable[ m_FunctionIndex ];
-		ReHook();
-		return FunctionAddress();
+		memset( this, 0, sizeof( CVMTHookManager ) );
 	}
 
-	void UnHook ( void )
+	CVMTHookManager( PDWORD* ppdwClassBase )
 	{
-		MEMORY_BASIC_INFORMATION mbi;
-		VirtualQuery( ( LPVOID )m_FunctionPointer, &mbi, sizeof( mbi ) );
-		VirtualProtect( ( LPVOID )mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &mbi.Protect );
-		m_ClassTable[ m_FunctionIndex ] = m_OriginalFunction;
-		VirtualProtect( ( LPVOID )mbi.BaseAddress, mbi.RegionSize, mbi.Protect, NULL );
-		FlushInstructionCache( GetCurrentProcess(), ( LPCVOID )m_FunctionPointer, sizeof( DWORD ) );
+		bInitialize( ppdwClassBase );
 	}
 
-	void ReHook ( void )
+	~CVMTHookManager( )
 	{
-		MEMORY_BASIC_INFORMATION mbi;
-		VirtualQuery( ( LPVOID )m_FunctionPointer, &mbi, sizeof( mbi ) );
-		VirtualProtect( ( LPVOID )mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &mbi.Protect );
-		m_ClassTable[ m_FunctionIndex ] = m_NewFunction;
-		VirtualProtect( ( LPVOID )mbi.BaseAddress, mbi.RegionSize, mbi.Protect, NULL );
-		FlushInstructionCache( GetCurrentProcess(), ( LPCVOID )m_FunctionPointer, sizeof( DWORD ) );
+		UnHook();
+	}
+	bool bInitialize( PDWORD* ppdwClassBase )
+	{
+		m_ppdwClassBase = ppdwClassBase;
+		m_pdwOldVMT = *ppdwClassBase;
+		m_dwVMTSize = dwGetVMTCount( *ppdwClassBase );
+		m_pdwNewVMT = new DWORD[ m_dwVMTSize ];
+		memcpy( m_pdwNewVMT, m_pdwOldVMT, sizeof( DWORD ) * m_dwVMTSize );
+		*ppdwClassBase = m_pdwNewVMT;
+		return true;
+	}
+	bool bInitialize( PDWORD** pppdwClassBase ) // fix for pp
+	{
+		return bInitialize( *pppdwClassBase );
 	}
 
-	DWORD FunctionAddress ( void )
+	void UnHook( )
 	{
-		return m_OriginalFunction;
+		if ( m_ppdwClassBase )
+		{
+			*m_ppdwClassBase = m_pdwOldVMT;
+		}
+	}
+
+	void ReHook( )
+	{
+		if ( m_ppdwClassBase )
+		{
+			*m_ppdwClassBase = m_pdwNewVMT;
+		}
+	}
+
+	int iGetFuncCount( )
+	{
+		return ( int ) m_dwVMTSize;
+	}
+
+	DWORD dwGetMethodAddress( int Index )
+	{
+		if ( Index >= 0 && Index <= ( int )m_dwVMTSize && m_pdwOldVMT != NULL )
+		{
+			return m_pdwOldVMT[ Index ];
+		}
+		return NULL;
+	}
+
+	PDWORD pdwGetOldVMT( )
+	{
+		return m_pdwOldVMT;
+	}
+
+	DWORD dwHookMethod( DWORD dwNewFunc, unsigned int iIndex )
+	{
+		if ( m_pdwNewVMT && m_pdwOldVMT && iIndex <= m_dwVMTSize && iIndex >= 0 )
+		{
+			m_pdwNewVMT[ iIndex ] = dwNewFunc;
+			return m_pdwOldVMT[ iIndex ];
+		}
+
+		return NULL;
 	}
 
 private:
-	// Member variables
-	int m_FunctionIndex;
-	PDWORD m_ClassTable;
-	PDWORD m_FunctionPointer;
-	DWORD m_NewFunction;
-	DWORD m_OriginalFunction;
+	DWORD dwGetVMTCount( PDWORD pdwVMT )
+	{
+		DWORD dwIndex = 0;
+
+		for ( dwIndex = 0; pdwVMT[ dwIndex ]; dwIndex++ )
+		{
+			if ( IsBadCodePtr( ( FARPROC ) pdwVMT[ dwIndex ] ) )
+			{
+				break;
+			}
+		}
+		return dwIndex;
+	}
+	PDWORD*	m_ppdwClassBase;
+	PDWORD	m_pdwNewVMT, m_pdwOldVMT;
+	DWORD	m_dwVMTSize;
 };
-#endif // __CVMTHOOK_H__
+//===================================================================================
